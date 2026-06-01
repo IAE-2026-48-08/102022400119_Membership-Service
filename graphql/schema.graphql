@@ -1,0 +1,155 @@
+"A datetime string with format `Y-m-d H:i:s`, e.g. `2018-05-23 13:43:32`."
+scalar DateTime @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\DateTime")
+
+"A date string with format `Y-m-d`, e.g. `2011-05-23`."
+scalar Date @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\Date")
+
+# ─── TYPES ─────────────────────────────────────────────────────────────
+
+type Member {
+    id: ID!
+    member_number: String!
+    name: String!
+    email: String!
+    phone: String!
+    vehicle_plate: String!
+    membership_type: String!
+    discount_percentage: Int!
+    status: String!
+    joined_at: DateTime!
+    expired_at: DateTime
+    created_at: DateTime!
+    updated_at: DateTime!
+    vouchers: [Voucher!]! @belongsToMany
+}
+
+type Voucher {
+    id: ID!
+    code: String!
+    name: String!
+    description: String
+    discount_type: String!
+    discount_value: Float!
+    min_duration_hours: Int!
+    max_discount_amount: Float
+    total_quota: Int!
+    claimed_count: Int!
+    valid_from: Date!
+    valid_until: Date!
+    is_active: Boolean!
+    created_at: DateTime!
+    updated_at: DateTime!
+    remaining_quota: Int!
+}
+
+type MemberVoucher {
+    id: ID!
+    member: Member! @belongsTo
+    voucher: Voucher! @belongsTo
+    claimed_at: DateTime!
+    used_at: DateTime
+    transaction_id: String
+    status: String!
+}
+
+type VerificationResult {
+    success: Boolean!
+    message: String!
+    vehicle_plate: String!
+    is_member: Boolean!
+    member_id: ID
+    member_number: String
+    member_name: String
+    membership_type: String
+    discount_percentage: Int
+    calculation: CalculationResult
+}
+
+type CalculationResult {
+    subtotal: Float!
+    discount_percentage: Int!
+    discount_amount: Float!
+    final_amount: Float!
+}
+
+type ClaimResult {
+    success: Boolean!
+    message: String!
+    data: MemberVoucher
+}
+
+type ValidationResult {
+    success: Boolean!
+    message: String!
+    voucher_code: String!
+    is_valid: Boolean!
+    discount_type: String
+    discount_value: Float
+    discount_amount: Float!
+    final_amount: Float
+    member_voucher_id: ID
+}
+
+type MarkUsedResult {
+    success: Boolean!
+    message: String!
+}
+
+# ─── QUERIES ───────────────────────────────────────────────────────────
+
+type Query {
+    "Lihat daftar semua member"
+    members: [Member!]! @all(orderBy: [{ column: "created_at", direction: DESC }])
+
+    "Detail member berdasarkan ID"
+    member(id: ID! @eq): Member @find
+
+    "Lihat daftar voucher yang masih aktif dan kuota tersedia"
+    vouchers: [Voucher!]! 
+        @where(clause: "where", column: "is_active", operator: "=", value: 1)
+        @all(orderBy: [{ column: "valid_until", direction: ASC }])
+
+    "Lihat voucher yang dimiliki oleh seorang member"
+    myVouchers(member_id: ID! @where(operator: "=")): [MemberVoucher!]! 
+        @all(orderBy: [{ column: "claimed_at", direction: DESC }])
+}
+
+# ─── MUTATIONS ─────────────────────────────────────────────────────────
+
+type Mutation {
+    "Daftarkan member baru"
+    storeMember(
+        name: String!
+        email: String!
+        phone: String!
+        vehicle_plate: String!
+        membership_type: String!
+        expired_at: Date
+    ): Member!
+
+    "Verifikasi membership saat transaksi parkir"
+    verifyMembership(
+        vehicle_plate: String!
+        subtotal: Float
+    ): VerificationResult!
+
+    "Member mengklaim voucher"
+    claimVoucher(
+        member_id: ID!
+        voucher_id: ID!
+    ): ClaimResult!
+
+    "Validasi voucher saat transaksi parkir"
+    validateVoucher(
+        voucher_code: String!
+        member_id: ID!
+        subtotal: Float!
+        duration_hours: Float!
+    ): ValidationResult!
+
+    "Tandai voucher terpakai setelah transaksi selesai"
+    markUsed(
+        member_voucher_id: ID!
+        transaction_id: String!
+    ): MarkUsedResult!
+}

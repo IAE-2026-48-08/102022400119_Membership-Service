@@ -1,5 +1,3 @@
-# Log Pemanfaatan AI dalam Pengembangan dan Deployment DPark Membership Service
-
 ## Informasi Proyek
 
 | Komponen            | Detail                                     |

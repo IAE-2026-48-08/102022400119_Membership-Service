@@ -2,20 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreMemberRequest;
 use App\Http\Requests\VerifyMemberRequest;
 use App\Models\Member;
 use App\Services\MembershipService;
 use Illuminate\Http\JsonResponse;
+use OpenApi\Attributes as OA;
 
 class MemberController extends Controller
 {
     public function __construct(protected MembershipService $membershipService) {}
 
-    /**
-     * GET /api/v1/members
-     * Admin melihat seluruh data member.
-     */
+    #[OA\Get(
+        path: "/members",
+        summary: "Get list of all members",
+        security: [["ApiKeyAuth" => []]],
+        tags: ["Member"]
+    )]
+    #[OA\Response(response: 200, description: "Successful operation")]
     public function index(): JsonResponse
     {
         $members = Member::orderBy('created_at', 'desc')->get();
@@ -27,10 +30,15 @@ class MemberController extends Controller
         ]);
     }
 
-    /**
-     * GET /api/v1/members/{id}
-     * Ambil detail & status membership (dipanggil Service B untuk cek diskon).
-     */
+    #[OA\Get(
+        path: "/members/{id}",
+        summary: "Get member details and membership status",
+        security: [["ApiKeyAuth" => []]],
+        tags: ["Member"]
+    )]
+    #[OA\Parameter(name: "id", in: "path", required: true, schema: new OA\Schema(type: "integer"))]
+    #[OA\Response(response: 200, description: "Successful operation")]
+    #[OA\Response(response: 404, description: "Member not found")]
     public function show(int $id): JsonResponse
     {
         $member = Member::find($id);
@@ -53,41 +61,22 @@ class MemberController extends Controller
         ]);
     }
 
-    /**
-     * POST /api/v1/members
-     * Daftarkan member baru. Nomor member & diskon di-generate otomatis.
-     */
-    public function store(StoreMemberRequest $request): JsonResponse
-    {
-        $memberType       = $request->membership_type;
-        $discountPercent  = $this->membershipService->getDiscountByType($memberType);
-        $memberNumber     = $this->membershipService->generateMemberNumber();
-
-        $member = Member::create([
-            'member_number'       => $memberNumber,
-            'name'                => $request->name,
-            'email'               => $request->email,
-            'phone'               => $request->phone,
-            'vehicle_plate'       => strtoupper($request->vehicle_plate),
-            'membership_type'     => $memberType,
-            'discount_percentage' => $discountPercent,
-            'status'              => 'active',
-            'joined_at'           => now(),
-            'expired_at'          => $request->expired_at ?? null,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => "Member baru berhasil didaftarkan dengan nomor {$memberNumber}. Diskon {$discountPercent}% akan diterapkan otomatis.",
-            'data'    => $member,
-        ], 201);
-    }
-
-    /**
-     * POST /api/v1/members/verification
-     * Verifikasi membership pengguna saat transaksi parkir berlangsung (dipanggil Service B).
-     * Input: vehicle_plate, subtotal (opsional untuk hitung langsung)
-     */
+    #[OA\Post(
+        path: "/members/verification",
+        summary: "Verify membership during parking transaction",
+        security: [["ApiKeyAuth" => []]],
+        tags: ["Member"]
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: "vehicle_plate", type: "string", example: "D 1234 ABC"),
+                new OA\Property(property: "subtotal", type: "number", nullable: true, example: 10000)
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: "Verification result")]
     public function verify(VerifyMemberRequest $request): JsonResponse
     {
         $result = $this->membershipService->verifyMembership($request->vehicle_plate);
@@ -101,7 +90,7 @@ class MemberController extends Controller
                     'is_member'           => false,
                     'discount_percentage' => 0,
                 ],
-            ], 200); // tetap 200 agar Service B tidak error, tapi is_member=false
+            ], 200);
         }
 
         $responseData = [
@@ -114,7 +103,6 @@ class MemberController extends Controller
             'discount_percentage' => $result['discount_percentage'],
         ];
 
-        // Jika subtotal dikirim, hitung langsung potongannya
         if ($request->filled('subtotal')) {
             $calc = $this->membershipService->applyMembershipDiscount(
                 (float) $request->subtotal,

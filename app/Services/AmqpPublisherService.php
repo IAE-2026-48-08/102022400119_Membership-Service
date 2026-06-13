@@ -43,6 +43,10 @@ class AmqpPublisherService
                 'data'        => $payload,
             ];
 
+            if (isset($payload['approved_by'])) {
+                $message['approved_by'] = $payload['approved_by'];
+            }
+
             Log::info('[AMQP] Mengirim event ke RabbitMQ', [
                 'event_type' => $eventType,
                 'exchange'   => 'iae.central.exchange',
@@ -101,17 +105,25 @@ class AmqpPublisherService
         string $memberName,
         string $membershipType,
         int $discountPercentage,
-        string $bearerToken
+        string $bearerToken,
+        array $approvedBy = []
     ): array {
-        return $this->publish('membership.verified', [
+        $payload = [
             'vehicle_plate'       => $vehiclePlate,
             'member_number'       => $memberNumber,
             'member_name'         => $memberName,
             'membership_type'     => $membershipType,
             'discount_percentage' => $discountPercentage,
             'verified_at'         => now()->toIso8601String(),
-        ], $bearerToken);
+        ];
+
+        if (!empty($approvedBy)) {
+            $payload['approved_by'] = $approvedBy;
+        }
+
+        return $this->publish('membership.verified', $payload, $bearerToken);
     }
+
 
     /**
      * Publish event MembershipExpired.

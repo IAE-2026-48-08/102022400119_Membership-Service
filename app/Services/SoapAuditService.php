@@ -176,9 +176,10 @@ XML;
         string $memberName,
         string $membershipType,
         int $discountPercentage,
-        string $bearerToken
+        string $bearerToken,
+        array $approvedBy = []
     ): array {
-        return $this->sendAudit('MembershipVerification', [
+        $data = [
             'vehicle_plate'       => $vehiclePlate,
             'member_number'       => $memberNumber,
             'member_name'         => $memberName,
@@ -186,7 +187,13 @@ XML;
             'discount_percentage' => $discountPercentage,
             'verified_at'         => now()->toIso8601String(),
             'service'             => 'DPark-Membership-Service',
-        ], $bearerToken);
+        ];
+
+        if (!empty($approvedBy)) {
+            $data['approved_by'] = $approvedBy;
+        }
+
+        return $this->sendAudit('MembershipVerification', $data, $bearerToken);
     }
 
     /**

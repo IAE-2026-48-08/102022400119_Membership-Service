@@ -41,6 +41,13 @@ Pengembangan dilakukan dengan membagi tugas besar menjadi modul-modul modular te
 > - Menuliskan dokumen `analisis_tugas_3.md` lengkap dengan diagram alur (Mermaid sequence diagram) dan justifikasi transaksi kritis.
 > - Membuat dokumen `prompt_engineering_log.md` ini.
 
+### Prompt 5: Debugging SSO Subject & Live Testing
+> **User**: *kenapa ornag orang ada sso subject nya kalo aku ada apa sso subject project aku*
+> **AI (Antigravity)**: 
+> - Menjelaskan bahwa sistem sudah menggunakan default SSO subject, namun memperbarui kode agar mengambil data dinamis `sub` dari hasil dekode M2M token.
+> - Menggunakan curl/Invoke-RestMethod untuk memanggil endpoint dan mendekode JWT token payload secara manual (Base64) guna menunjukkan bentuk asli data JWT.
+> - Menguji API endpoint secara live dengan memicu transaksi kritis (`POST /api/v1/members/verification`) dan mengonfirmasi bahwa seluruh integrasi SSO, SOAP Audit, dan RabbitMQ AMQP berhasil terkirim.
+
 ---
 
 ## 3. Hasil Sintesis Solusi

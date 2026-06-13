@@ -134,6 +134,26 @@ class MemberController extends Controller
             $responseData['calculation'] = $calc;
         }
 
+        // ─── Step 1.5: Dapatkan SSO Subject & Roles dari Token Request (jika ada) ───
+        $ssoSubject = null; // akan diisi dari JWT
+        $ssoRoles   = ['membership_operator'];
+
+        $incomingToken = $request->bearerToken();
+        if ($incomingToken) {
+            try {
+                $decodedPayload = $this->ssoService->verifyAndDecodeJwt($incomingToken);
+                if ($decodedPayload) {
+                    $ssoSubject = $decodedPayload['sub'] ?? $decodedPayload['email'] ?? $decodedPayload['user_id'] ?? $ssoSubject;
+                    $rolesFromJwt = $decodedPayload['roles'] ?? $decodedPayload['role'] ?? [];
+                    if (!empty($rolesFromJwt)) {
+                        $ssoRoles = is_array($rolesFromJwt) ? $rolesFromJwt : [$rolesFromJwt];
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('[Verify] Gagal decode incoming token, menggunakan fallback subject', ['error' => $e->getMessage()]);
+            }
+        }
+
         // ─── Step 2: Login M2M ke SSO Dosen ──────────────────────────────
         $ssoToken       = null;
         $ssoLoginResult = ['success' => false, 'message' => 'Skipped'];
@@ -143,9 +163,32 @@ class MemberController extends Controller
             $ssoLoginResult = ['success' => (bool) $ssoToken, 'message' => $ssoToken ? 'Login SSO berhasil.' : 'Login SSO gagal.'];
 
             Log::info('[Verify] SSO M2M login', ['success' => (bool) $ssoToken]);
+
+            // Jika ssoSubject masih null, ambil dari M2M token
+            if (!$ssoSubject && $ssoToken) {
+                try {
+                    $m2mPayload = $this->ssoService->verifyAndDecodeJwt($ssoToken);
+                    if ($m2mPayload) {
+                        $ssoSubject = $m2mPayload['sub'] ?? $m2mPayload['app']['client_id'] ?? 'KEY-MHS-25';
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('[Verify] Gagal decode M2M token untuk subject', ['error' => $e->getMessage()]);
+                }
+            }
         } catch (\Exception $e) {
             Log::warning('[Verify] SSO login gagal, lanjut tanpa audit', ['error' => $e->getMessage()]);
         }
+
+        // Fallback jika masih null
+        if (!$ssoSubject) {
+            $ssoSubject = 'KEY-MHS-25';
+        }
+
+        $approvedBy = [
+            'sso_subject' => $ssoSubject,
+            'roles'       => $ssoRoles,
+        ];
+
 
         $responseData['integrations'] = [
             'sso' => [
@@ -163,7 +206,8 @@ class MemberController extends Controller
                     memberName:         $result['member']->name,
                     membershipType:     $result['member']->membership_type,
                     discountPercentage: $result['discount_percentage'],
-                    bearerToken:        $ssoToken
+                    bearerToken:        $ssoToken,
+                    approvedBy:         $approvedBy
                 );
 
                 $responseData['integrations']['soap_audit'] = [
@@ -192,7 +236,8 @@ class MemberController extends Controller
                     memberName:         $result['member']->name,
                     membershipType:     $result['member']->membership_type,
                     discountPercentage: $result['discount_percentage'],
-                    bearerToken:        $ssoToken
+                    bearerToken:        $ssoToken,
+                    approvedBy:         $approvedBy
                 );
 
                 $responseData['integrations']['amqp'] = [

@@ -4,13 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\VerifyMemberRequest;
 use App\Models\Member;
+use App\Services\AmqpPublisherService;
 use App\Services\MembershipService;
+use App\Services\SoapAuditService;
+use App\Services\SsoService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 class MemberController extends Controller
 {
-    public function __construct(protected MembershipService $membershipService) {}
+    public function __construct(
+        protected MembershipService  $membershipService,
+        protected SsoService         $ssoService,
+        protected SoapAuditService   $soapAuditService,
+        protected AmqpPublisherService $amqpPublisher
+    ) {}
 
     #[OA\Get(
         path: "/members",
@@ -61,9 +70,22 @@ class MemberController extends Controller
         ]);
     }
 
+    /**
+     * Verifikasi Membership — Transaksi Kritis
+     *
+     * Ini adalah endpoint paling kritis di service ini karena:
+     * 1. Menentukan diskon finansial yang diterapkan ke pembayaran parkir
+     * 2. Menjadi dasar keputusan bisnis state-changing (diskon diterapkan/tidak)
+     *
+     * Alur integrasi:
+     * 1. Proses verifikasi membership
+     * 2. Jika member valid → Login SSO Dosen (M2M)
+     * 3. Kirim SOAP audit ke Cloud Dosen → simpan ReceiptNumber
+     * 4. Broadcast event ke RabbitMQ Cloud Dosen
+     */
     #[OA\Post(
         path: "/members/verification",
-        summary: "Verify membership during parking transaction",
+        summary: "Verify membership during parking transaction (Critical Transaction)",
         security: [["ApiKeyAuth" => []]],
         tags: ["Member"]
     )]
@@ -76,9 +98,10 @@ class MemberController extends Controller
             ]
         )
     )]
-    #[OA\Response(response: 200, description: "Verification result")]
+    #[OA\Response(response: 200, description: "Verification result with audit integration")]
     public function verify(VerifyMemberRequest $request): JsonResponse
     {
+        // ─── Step 1: Proses Verifikasi Membership ─────────────────────────
         $result = $this->membershipService->verifyMembership($request->vehicle_plate);
 
         if (!$result['valid']) {
@@ -109,6 +132,82 @@ class MemberController extends Controller
                 $result['discount_percentage']
             );
             $responseData['calculation'] = $calc;
+        }
+
+        // ─── Step 2: Login M2M ke SSO Dosen ──────────────────────────────
+        $ssoToken       = null;
+        $ssoLoginResult = ['success' => false, 'message' => 'Skipped'];
+
+        try {
+            $ssoToken       = $this->ssoService->getCachedM2mToken();
+            $ssoLoginResult = ['success' => (bool) $ssoToken, 'message' => $ssoToken ? 'Login SSO berhasil.' : 'Login SSO gagal.'];
+
+            Log::info('[Verify] SSO M2M login', ['success' => (bool) $ssoToken]);
+        } catch (\Exception $e) {
+            Log::warning('[Verify] SSO login gagal, lanjut tanpa audit', ['error' => $e->getMessage()]);
+        }
+
+        $responseData['integrations'] = [
+            'sso' => [
+                'success' => $ssoLoginResult['success'],
+                'message' => $ssoLoginResult['message'],
+            ],
+        ];
+
+        // ─── Step 3: Kirim SOAP Audit ke Cloud Dosen ─────────────────────
+        if ($ssoToken) {
+            try {
+                $soapResult = $this->soapAuditService->auditMembershipVerification(
+                    vehiclePlate:       $request->vehicle_plate,
+                    memberNumber:       $result['member']->member_number,
+                    memberName:         $result['member']->name,
+                    membershipType:     $result['member']->membership_type,
+                    discountPercentage: $result['discount_percentage'],
+                    bearerToken:        $ssoToken
+                );
+
+                $responseData['integrations']['soap_audit'] = [
+                    'success'        => $soapResult['success'],
+                    'receipt_number' => $soapResult['receipt_number'],
+                    'message'        => $soapResult['message'],
+                ];
+
+                Log::info('[Verify] SOAP audit selesai', [
+                    'success'        => $soapResult['success'],
+                    'receipt_number' => $soapResult['receipt_number'],
+                ]);
+            } catch (\Exception $e) {
+                Log::warning('[Verify] SOAP audit gagal', ['error' => $e->getMessage()]);
+                $responseData['integrations']['soap_audit'] = [
+                    'success' => false,
+                    'message' => 'SOAP audit error: ' . $e->getMessage(),
+                ];
+            }
+
+            // ─── Step 4: Broadcast Event ke RabbitMQ ─────────────────────
+            try {
+                $amqpResult = $this->amqpPublisher->publishMembershipVerified(
+                    vehiclePlate:       $request->vehicle_plate,
+                    memberNumber:       $result['member']->member_number,
+                    memberName:         $result['member']->name,
+                    membershipType:     $result['member']->membership_type,
+                    discountPercentage: $result['discount_percentage'],
+                    bearerToken:        $ssoToken
+                );
+
+                $responseData['integrations']['amqp'] = [
+                    'success' => $amqpResult['success'],
+                    'message' => $amqpResult['message'],
+                ];
+
+                Log::info('[Verify] AMQP event published', ['success' => $amqpResult['success']]);
+            } catch (\Exception $e) {
+                Log::warning('[Verify] AMQP publish gagal', ['error' => $e->getMessage()]);
+                $responseData['integrations']['amqp'] = [
+                    'success' => false,
+                    'message' => 'AMQP error: ' . $e->getMessage(),
+                ];
+            }
         }
 
         return response()->json([

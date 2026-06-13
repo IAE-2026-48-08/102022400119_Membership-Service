@@ -8,10 +8,12 @@
     "require": {
         "php": "^8.2",
         "darkaonline/l5-swagger": "^11.0",
+        "firebase/php-jwt": "^7.1",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "mll-lab/laravel-graphql-playground": "^1.1",
-        "nuwave/lighthouse": "^6.66"
+        "nuwave/lighthouse": "^6.66",
+        "php-amqplib/php-amqplib": "^2.8"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

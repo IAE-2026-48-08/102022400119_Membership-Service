@@ -42,7 +42,7 @@ return [
     */
     'iae_sso' => [
         'base_url' => env('IAE_SSO_BASE_URL', 'https://iae-sso.virtualfri.id'),
-        'api_key'  => env('IAE_SSO_API_KEY', 'KEY-MHS-01'),
+        'api_key'  => env('IAE_SSO_API_KEY', 'KEY-MHS-169'),
         'team_id'  => env('IAE_SSO_TEAM_ID', 'TEAM-08'),
     ],
 

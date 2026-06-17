@@ -169,7 +169,7 @@ class MemberController extends Controller
                 try {
                     $m2mPayload = $this->ssoService->verifyAndDecodeJwt($ssoToken);
                     if ($m2mPayload) {
-                        $ssoSubject = $m2mPayload['sub'] ?? $m2mPayload['app']['client_id'] ?? 'KEY-MHS-25';
+                        $ssoSubject = $m2mPayload['sub'] ?? $m2mPayload['app']['client_id'] ?? 'KEY-MHS-169';
                     }
                 } catch (\Exception $e) {
                     Log::warning('[Verify] Gagal decode M2M token untuk subject', ['error' => $e->getMessage()]);
@@ -181,7 +181,7 @@ class MemberController extends Controller
 
         // Fallback jika masih null
         if (!$ssoSubject) {
-            $ssoSubject = 'KEY-MHS-25';
+            $ssoSubject = 'KEY-MHS-169';
         }
 
         $approvedBy = [

@@ -64,7 +64,7 @@ class SsoController extends Controller
         required: true,
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'email', type: 'string', example: 'warga01@ktp.iae.id'),
+                new OA\Property(property: 'email', type: 'string', example: 'warga31@ktp.iae.id'),
                 new OA\Property(property: 'password', type: 'string', example: 'KtpDigital2026!'),
             ]
         )

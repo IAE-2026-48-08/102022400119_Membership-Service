@@ -26,7 +26,7 @@ class SsoService
     public function __construct()
     {
         $this->ssoBaseUrl = config('services.iae_sso.base_url', 'https://iae-sso.virtualfri.id');
-        $this->apiKey     = config('services.iae_sso.api_key', 'KEY-MHS-01');
+        $this->apiKey     = config('services.iae_sso.api_key', 'KEY-MHS-169');
     }
 
     /**

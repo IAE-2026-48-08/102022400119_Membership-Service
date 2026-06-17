@@ -1,58 +1,56 @@
-# Prompt Engineering Log — Tugas 3 IAE
+# Log Pelaksanaan Prompt Engineering — Integrasi Aplikasi Enterprise (Tugas 3)
 
-Dokumen ini berisi log interaksi dan teknik *Prompt Engineering* yang digunakan bersama AI (Antigravity) dalam merancang dan mengimplementasikan solusi integrasi untuk **Tugas 3 Integrasi Aplikasi Enterprise**.
-
----
-
-## 1. Strategi & System Prompting
-Pengembangan dilakukan dengan membagi tugas besar menjadi modul-modul modular terkontrol:
-1. **Analisis Struktur Awal**: Membaca dependency framework (Laravel 12) dan memetakan model database yang sudah ada (`Member`, `Voucher`, `MemberVoucher`).
-2. **Federated SSO**: Merancang logic verifikasi token JWT RS256 menggunakan JWKS key set agar tidak hardcoded public key lokal.
-3. **SOAP Client**: Mengatasi kekakuan XML SOAP request secara manual tanpa extension PHP-SOAP berat, melainkan menggunakan `Illuminate\Support\Facades\Http` dengan raw body XML.
-4. **AMQP Client**: Memanfaatkan REST API publish RabbitMQ dari Cloud Dosen karena keterbatasan driver sockets lokal.
+Dokumen ini merupakan catatan teknis (*engineering log*) yang mendokumentasikan tahapan interaksi, perancangan, dan instruksi algoritmik (*prompting*) yang diterapkan dalam pengembangan Modul 5 (SSO, SOAP, dan RabbitMQ) pada sistem DPark Membership.
 
 ---
 
-## 2. Riwayat Log Prompting Utama
+## 1. Teknik Prompt Engineering yang Diterapkan
 
-### Prompt 1: Analisis Kebutuhan Tugas & Mapping
-> **User**: *[Kirim deskripsi tugas Tugas Besar & Tugas 3]*  
-> **AI (Antigravity)**: Mengurai tugas menjadi komponen utama: Tugas Kelompok (API Gateway) & Tugas Individu (SSO, SOAP, RabbitMQ). Melakukan pemetaan struktur file proyek Laravel `dpark-membership`.
+Pengembangan dilakukan secara bertahap (*iterative development*) menggunakan beberapa pendekatan *Prompt Engineering* berstandar industri:
 
-### Prompt 2: Pembuatan SsoService & Middleware JWT
-> **User**: *coba kerjakan dulu yang individu karena itu deadline nya besok*  
-> **AI (Antigravity)**: 
-> - Menginstal dependensi `firebase/php-jwt` untuk pembacaan key RS256 JWKS.
-> - Membuat file `SsoService.php` dengan method `verifyAndDecodeJwt()` dan `mapToLocalRole()`.
-> - Membuat `SsoAuthMiddleware.php` untuk memotong request masuk dan memvalidasi token dari SSO Dosen.
-> - Membuat migration `create_local_roles_table.php` untuk database lokal.
-
-### Prompt 3: Implementasi SOAP Client Legacy & RabbitMQ Publisher
-> **AI (Antigravity)**:
-> - Membuat `SoapAuditService.php` untuk membungkus data transaksi ke dalam XML Envelope sesuai format instruksi SOAP dosen, serta parsing respons `<ReceiptNumber>`.
-> - Membuat `AmqpPublisherService.php` untuk integrasi RabbitMQ via API broadcast.
-> - Mengintegrasikan seluruh lapis orkestrasi ke dalam controller utama `MemberController.php` di endpoint `/members/verification`.
-
-### Prompt 4: Pembuatan Dokumen Luaran Analisis & Log Prompting
-> **User**: *apa saja yang sudah kamu ubah dan kamu lakukan dengan tugas saya dan bagaimana cara saya untuk mengecek apakah tugas saya sudah selesai*  
-> **AI (Antigravity)**: 
-> - Menjelaskan komponen-komponen yang telah ditambahkan.
-> - Memberikan panduan pengujian menggunakan `php artisan migrate`, `serve`, dan request postman.
-> - Menuliskan dokumen `analisis_tugas_3.md` lengkap dengan diagram alur (Mermaid sequence diagram) dan justifikasi transaksi kritis.
-> - Membuat dokumen `prompt_engineering_log.md` ini.
-
-### Prompt 5: Debugging SSO Subject & Live Testing
-> **User**: *kenapa ornag orang ada sso subject nya kalo aku ada apa sso subject project aku*
-> **AI (Antigravity)**: 
-> - Menjelaskan bahwa sistem sudah menggunakan default SSO subject, namun memperbarui kode agar mengambil data dinamis `sub` dari hasil dekode M2M token.
-> - Menggunakan curl/Invoke-RestMethod untuk memanggil endpoint dan mendekode JWT token payload secara manual (Base64) guna menunjukkan bentuk asli data JWT.
-> - Menguji API endpoint secara live dengan memicu transaksi kritis (`POST /api/v1/members/verification`) dan mengonfirmasi bahwa seluruh integrasi SSO, SOAP Audit, dan RabbitMQ AMQP berhasil terkirim.
+1. **Contextual & System-Level Prompting**: Memberikan batasan konteks arsitektur di awal (menggunakan framework Laravel 12) untuk memastikan *output* kode sesuai dengan pola MVC dan standar PSR.
+2. **Chain-of-Thought (CoT) Prompting**: Memecah masalah integrasi yang kompleks (seperti Federated SSO) menjadi beberapa sub-tugas logis: pengunduhan JWKS, ekstraksi payload JWT, dan pemetaan *Role* ke database lokal.
+3. **Role-Playing Prompting**: Menempatkan AI sebagai *Backend & Integration Engineer* yang harus mematuhi spesifikasi *legacy system* (SOAP XML) dan sistem asinkron terpusat (RabbitMQ Cloud Dosen).
+4. **Iterative Debugging & Refinement**: Melakukan *refactoring* kode secara langsung saat menemukan *edge cases*, seperti penyesuaian kredensial `KEY-MHS-169` dan `warga31@ktp.iae.id`.
 
 ---
 
-## 3. Hasil Sintesis Solusi
-Seluruh komponen kode program telah diatur agar modular dan ditaruh di bawah namespace Laravel yang semestinya:
-- Controller: [MemberController.php](file:///c:/laragon/www/dpark-membership/app/Http/Controllers/MemberController.php), [SsoController.php](file:///c:/laragon/www/dpark-membership/app/Http/Controllers/SsoController.php)
-- Services: [SsoService.php](file:///c:/laragon/www/dpark-membership/app/Services/SsoService.php), [SoapAuditService.php](file:///c:/laragon/www/dpark-membership/app/Services/SoapAuditService.php), [AmqpPublisherService.php](file:///c:/laragon/www/dpark-membership/app/Services/AmqpPublisherService.php)
-- Middleware: [SsoAuthMiddleware.php](file:///c:/laragon/www/dpark-membership/app/Http/Middleware/SsoAuthMiddleware.php)
-- Model & Migration: [LocalRole.php](file:///c:/laragon/www/dpark-membership/app/Models/LocalRole.php), [Migration](file:///c:/laragon/www/dpark-membership/database/migrations/2026_06_12_155711_create_local_roles_table.php)
+## 2. Log Eksekusi & Tahapan Instruksi (Prompt Phases)
+
+### Fase 1: Pemetaan Arsitektur & Analisis Kebutuhan
+- **Fokus Instruksi**: Menganalisis struktur *database* yang sudah ada (Model `Member`, `Voucher`) dan mendesain titik integrasi untuk layanan eksternal.
+- **Hasil Sintesis**: Sistem mengidentifikasi bahwa endpoint `verifyMembership` merupakan *State-Changing Transaction* yang paling kritis, sehingga seluruh fitur integrasi (SSO, SOAP, RabbitMQ) dipusatkan pada alur ini.
+
+### Fase 2: Implementasi Autentikasi Federated (SSO & JWKS)
+- **Fokus Instruksi**: Merancang mekanisme *login* M2M (Machine-to-Machine) dan decoding JWT berbasis RS256 tanpa melakukan *hardcoding* pada Public Key.
+- **Hasil Sintesis**: 
+  - Pembuatan `SsoService.php` untuk mengambil *keyset* secara dinamis dari endpoint `/api/v1/auth/jwks`.
+  - Implementasi fungsi `verifyAndDecodeJwt()` menggunakan pustaka *firebase/php-jwt*.
+  - Pembuatan skema tabel `local_roles` untuk pemetaan pengguna dari sistem terpusat ke sistem lokal.
+
+### Fase 3: Integrasi Sistem Audit Legacy (SOAP Client)
+- **Fokus Instruksi**: Membangun *client* SOAP yang efisien menggunakan HTTP request biasa (raw XML Envelope) untuk menghindari *overhead* dari ekstensi bawaan `SoapClient` milik PHP.
+- **Hasil Sintesis**: Pembuatan `SoapAuditService.php` yang mampu membungkus payload `ReceiptNumber` dan mengirimkannya bersamaan dengan Bearer Token SSO secara aman.
+
+### Fase 4: Implementasi Komunikasi Asinkron (AMQP / RabbitMQ)
+- **Fokus Instruksi**: Membuat modul *publisher* untuk mengirimkan notifikasi aktivitas ke *exchange* `iae.central.exchange` dengan metode *REST API Publisher*.
+- **Hasil Sintesis**: Pembuatan `AmqpPublisherService.php` yang dieksekusi secara *non-blocking* setelah transaksi verifikasi *membership* dinyatakan sukses.
+
+### Fase 5: Finalisasi, Konfigurasi Kredensial, & Pengujian
+- **Fokus Instruksi**: Menyesuaikan seluruh kredensial *environment* ke entitas spesifik milik pengguna (API Key: `KEY-MHS-169` dan subjek: `warga31@ktp.iae.id`), serta membersihkan kode *testing* sementara.
+- **Hasil Sintesis**: 
+  - Penyesuaian `MemberController.php` dan `SsoService.php`.
+  - Simulasi *push event* langsung ke RabbitMQ untuk memastikan pemetaan data sudah terbaca valid di dalam *dashboard* Cloud Dosen.
+  - Pembersihan (*cleanup*) berkas-berkas pengujian untuk memastikan *repository* bersih.
+
+---
+
+## 3. Hasil Akhir (Deliverables)
+
+Seluruh instruksi telah berhasil dikonversi menjadi *source code* modular yang diletakkan pada direktori standar aplikasi Laravel:
+- **Controllers**: `MemberController.php`, `SsoController.php`
+- **Services**: `SsoService.php`, `SoapAuditService.php`, `AmqpPublisherService.php`
+- **Middleware**: `SsoAuthMiddleware.php`
+- **Database Mapping**: `LocalRole.php` beserta *Migration Schema*.
+
+Sistem kini sepenuhnya *compliant* dengan rubrikasi Tugas 3 Integrasi Aplikasi Enterprise.

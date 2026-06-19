@@ -22,11 +22,13 @@ class SsoService
 {
     protected string $ssoBaseUrl;
     protected string $apiKey;
+    protected string $nim;
 
     public function __construct()
     {
         $this->ssoBaseUrl = config('services.iae_sso.base_url', 'https://iae-sso.virtualfri.id');
         $this->apiKey     = config('services.iae_sso.api_key', 'KEY-MHS-169');
+        $this->nim        = config('services.iae_sso.nim', '102022400119');
     }
 
     /**
@@ -41,6 +43,7 @@ class SsoService
             $response = Http::timeout(10)
                 ->post("{$this->ssoBaseUrl}/api/v1/auth/token", [
                     'api_key' => $this->apiKey,
+                    'nim'     => $this->nim,
                 ]);
 
             if ($response->successful()) {
